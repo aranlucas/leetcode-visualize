@@ -1,0 +1,18 @@
+{
+  "name": "problem-prism",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/extension"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces",
+    "dev:extension": "npm run dev --workspace @problem-prism/extension",
+    "test": "npm run test --workspaces"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

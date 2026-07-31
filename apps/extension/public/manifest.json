@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "ProblemPrism — Coding interview tutor",
+  "description": "Learn how to reason through LeetCode and NeetCode problems with interview coaching, opt-in code review, hints, and interactive visualizations.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtAHAivckNZBxA4gHuW0JZyvY0EMZUKPqXZF6+dmaP7p51Ky9H00XkKNK4gTYiwDkAeeSNz9uMo8PVgaB5Z/UQwXeCAfa6giFA3+pNwfJeGws/g0PiPLnLMsYA1sm1YRjS7Y5Ib9EVVtstknHC6plAPCqmGqB12cytCh3E3sfSl7L0u8zeESl318A+RgZxMN/v/argM+Uy0MBghUpWO8uYAyT6Dft+Z5v0flWKq7Et3V6vXRtjRSbjz8AtWiPHChYePZ5naea6NvGEs3Pew4r5w30bTjoSvVMbD73MMjhqrR3SUZZcx2cWi9HxwXuUteIX9fcDYfRLudYgEVo5M/ygQIDAQAB",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "action": {
+    "default_title": "Open ProblemPrism",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/problems/*",
+        "https://*.leetcode.com/problems/*",
+        "https://neetcode.io/problems/*"
+      ],
+      "js": [
+        "assets/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://auth.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://leetcode.com/*",
+    "https://*.leetcode.com/*",
+    "https://neetcode.io/*"
+  ],
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "notifications",
+    "scripting",
+    "sidePanel",
+    "storage"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

@@ -35,7 +35,7 @@ There is no ProblemPrism server and no OpenAI API key.
 
 ## Build and install
 
-Requirements: Node.js 20+ and Chrome.
+Requirements: Node.js 24 LTS (`24.15.0` or newer) and Chrome.
 
 ```bash
 npm install

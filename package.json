@@ -13,6 +13,9 @@
     "test": "npm run test --workspaces"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^24.15.0"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
   }
 }

@@ -7,11 +7,12 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    rollupOptions: {
+    chunkSizeWarningLimit: 520,
+    rolldownOptions: {
       input: {
-        sidepanel: resolve(__dirname, "sidepanel.html"),
-        background: resolve(__dirname, "src/background.ts"),
-        content: resolve(__dirname, "src/content/index.ts"),
+        sidepanel: resolve(import.meta.dirname, "sidepanel.html"),
+        background: resolve(import.meta.dirname, "src/background.ts"),
+        content: resolve(import.meta.dirname, "src/content/index.ts"),
       },
       output: {
         entryFileNames: "assets/[name].js",
@@ -21,4 +22,3 @@ export default defineConfig({
     },
   },
 });
-

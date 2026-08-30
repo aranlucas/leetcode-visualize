@@ -112,13 +112,16 @@ export function TutorPanel({
         <h2>Your interview path</h2>
         <span>{stageIndex + 1} of {stages.length}</span>
       </div>
+      <p aria-atomic="true" aria-live="polite" className="sr-only">
+        Stage {stageIndex + 1} of {stages.length}: {stage.title}
+      </p>
       <InterviewPath
         activeIndex={stageIndex}
         furthestIndex={furthestIndex}
         onSelect={goToStage}
       />
 
-      <article className="coaching-stage" aria-live="polite">
+      <article className="coaching-stage">
         <header className="coaching-stage-header">
           <span>{stageIndex + 1}</span>
           <div>

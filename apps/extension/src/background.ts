@@ -17,6 +17,8 @@ import {
   codeReviewPrompt,
   DIRECT_ANSWER_SYSTEM_PROMPT,
   directAnswerPrompt,
+  PROBLEM_CHAT_SYSTEM_PROMPT,
+  problemChatPrompt,
   TUTORING_SYSTEM_PROMPT,
   tutoringPrompt,
 } from "./ai/prompt";
@@ -29,6 +31,7 @@ import {
   directAnswerRequestSchema,
   directAnswerSchema,
   problemSchema,
+  problemChatRequestSchema,
   tutoringSessionSchema,
 } from "./ai/schema";
 import { sanitizeCodeReview } from "./ai/code-review-policy";
@@ -46,9 +49,12 @@ import type {
   CodeReview,
   DirectAnswer,
   ExtensionMessage,
+  ProblemChatStreamEvent,
+  ProblemChatStreamRequest,
   TeachingStyle,
   TutoringSession,
 } from "./types";
+import { PROBLEM_CHAT_STREAM_PORT } from "./types";
 import {
   supportsProblemPage,
   tabScopedSidePanelPath,
@@ -201,7 +207,7 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
-  if (change.url) {
+  if (change.url || change.status === "complete") {
     void configureTabPanel(tabId, change.url ?? tab.url).catch(() => undefined);
   }
 });
@@ -524,6 +530,44 @@ async function createDirectAnswer(input: {
   return { ...output, model, reminderAt };
 }
 
+async function streamProblemChatReply(
+  input: ProblemChatStreamRequest,
+  abortSignal: AbortSignal,
+  emit: (event: ProblemChatStreamEvent) => void,
+): Promise<void> {
+  const parsed = problemChatRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(
+      "That conversation could not be sent. Start a new chat and try again.",
+    );
+  }
+
+  const { chatgpt, model } = await chatGPTModel();
+  emit({ type: "started", model });
+  let streamError: unknown;
+  let content = "";
+  const result = streamText({
+    abortSignal,
+    model: chatgpt(model),
+    onError: ({ error }) => {
+      streamError = error;
+    },
+    system: PROBLEM_CHAT_SYSTEM_PROMPT,
+    prompt: problemChatPrompt(parsed.data),
+  });
+
+  for await (const delta of result.textStream) {
+    if (abortSignal.aborted) return;
+    content += delta;
+    emit({ type: "delta", delta });
+  }
+
+  if (streamError) throw streamError;
+  if (!content.trim()) {
+    throw new Error("ChatGPT did not return an answer. Please try again.");
+  }
+}
+
 async function handleMessage(message: ExtensionMessage): Promise<unknown> {
   switch (message.type) {
     case "PROBLEM_PRISM_AUTH_STATUS":
@@ -547,6 +591,68 @@ async function handleMessage(message: ExtensionMessage): Promise<unknown> {
   }
 }
 
+async function backgroundErrorMessage(error: unknown): Promise<string> {
+  if (
+    error instanceof ChatGPTAuthError &&
+    (error.code === "refresh_token_invalid" || error.code === "invalid_token")
+  ) {
+    await chrome.storage.local.remove(TOKENS_KEY);
+  }
+  return NoObjectGeneratedError.isInstance(error)
+    ? "ChatGPT could not create a valid coaching response. Please try again."
+    : error instanceof Error
+      ? error.message
+      : "The ProblemPrism request failed.";
+}
+
+function postChatStreamEvent(
+  port: chrome.runtime.Port,
+  event: ProblemChatStreamEvent,
+): void {
+  try {
+    port.postMessage(event);
+  } catch {
+    // The side panel can close while ChatGPT is finishing a response.
+  }
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== PROBLEM_CHAT_STREAM_PORT) return;
+
+  const abortController = new AbortController();
+  let started = false;
+  port.onDisconnect.addListener(() => abortController.abort());
+  port.onMessage.addListener((message: unknown) => {
+    if (
+      started ||
+      !message ||
+      typeof message !== "object" ||
+      (message as { type?: unknown }).type !== "start"
+    ) {
+      return;
+    }
+    started = true;
+
+    void streamProblemChatReply(
+      message as ProblemChatStreamRequest,
+      abortController.signal,
+      (event) => postChatStreamEvent(port, event),
+    )
+      .then(() => {
+        if (!abortController.signal.aborted) {
+          postChatStreamEvent(port, { type: "done" });
+        }
+      })
+      .catch(async (error: unknown) => {
+        if (abortController.signal.aborted) return;
+        postChatStreamEvent(port, {
+          type: "error",
+          error: await backgroundErrorMessage(error),
+        });
+      });
+  });
+});
+
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   if (!message.type.startsWith("PROBLEM_PRISM_")) return;
 
@@ -555,19 +661,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
       sendResponse({ ok: true, data } satisfies BackgroundResponse<unknown>);
     })
     .catch(async (error: unknown) => {
-      if (
-        error instanceof ChatGPTAuthError &&
-        (error.code === "refresh_token_invalid" || error.code === "invalid_token")
-      ) {
-        await chrome.storage.local.remove(TOKENS_KEY);
-      }
-      const message =
-        NoObjectGeneratedError.isInstance(error)
-          ? "ChatGPT could not create a valid coaching response. Please try again."
-          : error instanceof Error
-            ? error.message
-            : "The ProblemPrism request failed.";
-      sendResponse({ ok: false, error: message } satisfies BackgroundResponse<never>);
+      sendResponse({
+        ok: false,
+        error: await backgroundErrorMessage(error),
+      } satisfies BackgroundResponse<never>);
     });
 
   return true;

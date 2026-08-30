@@ -14,6 +14,7 @@ import {
   codeReviewSchema,
   directAnswerRequestSchema,
   directAnswerSchema,
+  problemChatRequestSchema,
   tutoringSessionSchema,
 } from "./schema";
 
@@ -81,5 +82,34 @@ describe("direct answer schema", () => {
         teachingStyle: "guided",
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("problem chat schema", () => {
+  it("accepts an alternating conversation ending with the learner", () => {
+    expect(
+      problemChatRequestSchema.safeParse({
+        messages: [
+          { role: "user", content: "What does the constraint tell me?" },
+          { role: "assistant", content: "It rules out checking every pair." },
+          { role: "user", content: "What should I track instead?" },
+        ],
+        problem: demoProblem,
+        teachingStyle: "guided",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects consecutive learner turns", () => {
+    expect(
+      problemChatRequestSchema.safeParse({
+        messages: [
+          { role: "user", content: "First question" },
+          { role: "user", content: "Second question" },
+        ],
+        problem: demoProblem,
+        teachingStyle: "guided",
+      }).success,
+    ).toBe(false);
   });
 });

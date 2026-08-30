@@ -6,9 +6,13 @@ import type {
   ExtensionMessage,
   InterviewStage,
   Problem,
+  ProblemChatStreamRequest,
+  ProblemChatTurn,
   TeachingStyle,
   TutoringSession,
 } from "../types";
+import { PROBLEM_CHAT_STREAM_PORT } from "../types";
+import { consumeProblemChatPort } from "./chat-stream";
 
 interface MessageResponse<T> {
   ok: boolean;
@@ -83,3 +87,24 @@ export const getDirectAnswer = (
     teachingStyle,
     currentCode,
   });
+
+export const streamProblemQuestion = (
+  problem: Problem,
+  teachingStyle: TeachingStyle,
+  messages: ProblemChatTurn[],
+  onDelta: (content: string, model: string) => void,
+) => {
+  const request: ProblemChatStreamRequest = {
+    type: "start",
+    problem,
+    teachingStyle,
+    messages,
+  };
+  const port = chrome.runtime.connect({ name: PROBLEM_CHAT_STREAM_PORT });
+  return consumeProblemChatPort(
+    port,
+    request,
+    onDelta,
+    () => chrome.runtime.lastError?.message,
+  );
+};

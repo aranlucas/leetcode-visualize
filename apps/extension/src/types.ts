@@ -166,6 +166,36 @@ export interface DirectAnswer {
   reminderAt: number;
 }
 
+export interface ProblemChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ProblemChatMessage extends ProblemChatTurn {
+  id: string;
+  model?: string;
+}
+
+export interface ProblemChatReply {
+  content: string;
+  model: string;
+}
+
+export const PROBLEM_CHAT_STREAM_PORT = "problem-prism-chat-stream";
+
+export interface ProblemChatStreamRequest {
+  type: "start";
+  problem: Problem;
+  teachingStyle: TeachingStyle;
+  messages: ProblemChatTurn[];
+}
+
+export type ProblemChatStreamEvent =
+  | { type: "started"; model: string }
+  | { type: "delta"; delta: string }
+  | { type: "done" }
+  | { type: "error"; error: string };
+
 export type AuthStatus =
   | "authenticated"
   | "error"

@@ -12,6 +12,17 @@ describe("tab-scoped side panel", () => {
       supportsProblemPage("https://leetcode.com/problems/two-sum/"),
     ).toBe(true);
     expect(
+      supportsProblemPage(
+        "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/description/",
+      ),
+    ).toBe(true);
+    expect(supportsProblemPage("https://leetcode.cn/problems/two-sum/")).toBe(
+      true,
+    );
+    expect(
+      supportsProblemPage("https://cn.leetcode.cn/problems/two-sum/"),
+    ).toBe(true);
+    expect(
       supportsProblemPage("https://neetcode.io/problems/two-integer-sum"),
     ).toBe(true);
     expect(supportsProblemPage("https://leetcode.com/problemset/")).toBe(false);

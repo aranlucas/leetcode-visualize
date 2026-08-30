@@ -55,7 +55,10 @@ export function AnswerFeedbackPanel({
       {error ? <div className="answer-error" role="alert">{error}</div> : null}
 
       {feedback ? (
-        <article className="answer-feedback" aria-live="polite">
+        <article className="answer-feedback">
+          <p aria-live="polite" className="sr-only">
+            Feedback from ChatGPT is ready.
+          </p>
           <header>
             <span>Feedback from ChatGPT</span>
             <p>{feedback.summary}</p>

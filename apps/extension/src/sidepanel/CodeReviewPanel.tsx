@@ -42,6 +42,7 @@ export function CodeReviewPanel({
   const runReview = async () => {
     const requestId = ++requestRef.current;
     setError(undefined);
+    setResult(undefined);
     setIsPending(true);
     try {
       const current = isDemo ? demoCurrentCode : await readCode();
@@ -58,6 +59,7 @@ export function CodeReviewPanel({
       setResult(next);
     } catch (reviewFailure) {
       if (requestId !== requestRef.current) return;
+      setResult(undefined);
       setError(
         reviewFailure instanceof Error
           ? reviewFailure.message
@@ -109,7 +111,10 @@ export function CodeReviewPanel({
       ) : null}
 
       {result ? (
-        <article className="code-review-result" aria-live="polite">
+        <article className="code-review-result">
+          <p aria-live="polite" className="sr-only">
+            Code review is ready.
+          </p>
           <header>
             <div>
               <span className={`code-status ${result.review.status}`}>

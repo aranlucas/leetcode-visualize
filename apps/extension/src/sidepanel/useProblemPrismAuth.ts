@@ -93,9 +93,10 @@ export function useProblemPrismAuth() {
   };
 
   const copyCode = async () => {
-    if (state.pending?.userCode && navigator.clipboard) {
-      await navigator.clipboard.writeText(state.pending.userCode);
+    if (!state.pending?.userCode || !navigator.clipboard) {
+      throw new Error("Clipboard access is unavailable.");
     }
+    await navigator.clipboard.writeText(state.pending.userCode);
   };
 
   const reopen = () => {

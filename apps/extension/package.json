@@ -7,7 +7,7 @@
     "build": "vite build",
     "check": "tsc --noEmit",
     "dev": "vite",
-    "test": "vitest run"
+    "test": "vitest run --maxWorkers=1"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.27",
@@ -16,6 +16,7 @@
     "ai": "7.0.47",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "streamdown": "^2.5.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

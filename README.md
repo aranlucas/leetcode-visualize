@@ -4,6 +4,11 @@ ProblemPrism is a client-only Chrome MV3 side-panel extension for LeetCode and N
 
 ProblemPrism does not inspect submission history or read editor code automatically. **Check my current code** reads the active LeetCode or NeetCode editor only when clicked, then critiques correctness, complexity, and edge cases without generating a replacement solution.
 
+On LeetCode's current Monaco-based interface, ProblemPrism also adds a **Format**
+button beside the code editor. Legacy CodeMirror layouts are intentionally ignored.
+It formats Java, C++, JavaScript, TypeScript, and Dart locally in the browser.
+Use `Ctrl+Alt+F` to run the same action from the keyboard.
+
 The tutoring flow starts at the beginning:
 
 - Choose question-led coaching, an example-first walkthrough, or pattern recognition.
@@ -27,6 +32,10 @@ Everything runs inside `apps/extension`:
 - Full-answer retry reminders use Chrome's local alarms and notifications APIs. They do not require a ProblemPrism server.
 - Visualizations can render arrays, graphs, trees, grids, or richer data-flow scenes with metrics, transformations, and evolving keyed buckets.
 - The side panel renders every response as trusted native React and SVG UI; it does not execute model-generated code.
+- The LeetCode formatter is based on the ISC-licensed
+  [`madhur/leetcode-format-chrome-extension`](https://github.com/madhur/leetcode-format-chrome-extension);
+  attribution and the license text are in `THIRD_PARTY_NOTICES.md`. Its
+  language-specific runtimes load only after you use the Format action.
 - Login tokens are stored in `chrome.storage.local` and restricted to trusted extension contexts with `setAccessLevel`. They are never exposed to the page or content script.
 
 There is no ProblemPrism server and no OpenAI API key.

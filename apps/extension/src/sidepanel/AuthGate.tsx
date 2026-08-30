@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ProblemPrismAuth } from "./auth-types";
 
 interface Props {
@@ -13,14 +14,40 @@ export function AuthGate({
   onShowConsent,
   showConsent,
 }: Props) {
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed">();
+
+  const copyDeviceCode = async () => {
+    const code = auth.pending?.userCode;
+    if (!code) return;
+
+    try {
+      await auth.copyCode();
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+  };
+
   if (auth.status === "pending") {
     return (
       <section className="auth-gate">
         <h1>Finish connecting ChatGPT</h1>
         <p>Enter this one-time code in the OpenAI window. It has also been copied when permitted.</p>
-        <button className="device-code" onClick={() => void auth.copyCode()} type="button">
+        <button
+          aria-label="Copy device code"
+          className="device-code"
+          onClick={() => void copyDeviceCode()}
+          type="button"
+        >
           {auth.pending?.userCode}
         </button>
+        <span aria-live="polite" className="auth-copy-status" role="status">
+          {copyStatus === "copied"
+            ? "Copied to clipboard."
+            : copyStatus === "failed"
+              ? "Copy unavailable. Select and copy the code instead."
+              : ""}
+        </span>
         <button className="secondary-button" onClick={auth.reopen} type="button">
           Reopen OpenAI
         </button>
@@ -69,7 +96,7 @@ export function AuthGate({
       <button className="primary-button" onClick={onShowConsent} type="button">
         Login with ChatGPT
       </button>
-      {auth.error ? <p className="error-text">{auth.error}</p> : null}
+      {auth.error ? <p className="error-text" role="alert">{auth.error}</p> : null}
     </section>
   );
 }

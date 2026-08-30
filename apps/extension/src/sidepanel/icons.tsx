@@ -134,3 +134,12 @@ export function CodeIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   );
 }
+
+export function SendIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="m4 4 16 8-16 8 3-8-3-8Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M7 12h13" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </IconBase>
+  );
+}

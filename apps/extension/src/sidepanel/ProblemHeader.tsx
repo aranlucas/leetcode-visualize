@@ -16,6 +16,31 @@ export function ProblemHeader({
   onRefresh,
   onUseSelection,
 }: Props) {
+  const refreshButton = (
+    <button
+      aria-label="Refresh detected problem"
+      className="icon-button"
+      disabled={isRefreshing}
+      onClick={onRefresh}
+      title="Refresh detected problem"
+      type="button"
+    >
+      <RefreshIcon className={isRefreshing ? "spin" : undefined} />
+    </button>
+  );
+  const externalLink = (
+    <a
+      aria-label={`Open ${problem.title} in a new tab`}
+      className="icon-button"
+      href={problem.url}
+      rel="noreferrer"
+      target="_blank"
+      title={`Open ${problem.title} in a new tab`}
+    >
+      <ExternalIcon />
+    </a>
+  );
+
   return (
     <section
       className={compact ? "problem-header compact" : "problem-header"}
@@ -26,15 +51,7 @@ export function ProblemHeader({
           <span className="section-label">
             Detected on {problem.platform === "leetcode" ? "LeetCode" : "NeetCode"}
           </span>
-          <button
-            aria-label="Refresh detected problem"
-            className="icon-button"
-            disabled={isRefreshing}
-            onClick={onRefresh}
-            type="button"
-          >
-            <RefreshIcon className={isRefreshing ? "spin" : undefined} />
-          </button>
+          {refreshButton}
         </div>
       ) : null}
       <div className="title-row">
@@ -53,27 +70,29 @@ export function ProblemHeader({
             ))}
           </div>
         </div>
-        {!compact ? (
-          <a
-            aria-label={`Open ${problem.title} in a new tab`}
-            className="icon-button"
-            href={problem.url}
-            rel="noreferrer"
-            target="_blank"
+        {compact ? (
+          <div
+            aria-label="Problem actions"
+            className="tags"
+            role="group"
           >
-            <ExternalIcon />
-          </a>
-        ) : null}
+            {refreshButton}
+            {externalLink}
+          </div>
+        ) : externalLink}
       </div>
-      {!compact ? (
-        <>
-          <button className="selection-button" onClick={onUseSelection} type="button">
-            Use highlighted question text
-          </button>
-          {problem.selectedText ? (
-            <p className="selection-note">Using your highlighted excerpt from the problem.</p>
-          ) : null}
-        </>
+      <button
+        aria-label="Use highlighted question text"
+        aria-pressed={Boolean(problem.selectedText)}
+        className="selection-button"
+        onClick={onUseSelection}
+        title="Use highlighted question text from the problem"
+        type="button"
+      >
+        {compact ? "Use highlighted text" : "Use highlighted question text"}
+      </button>
+      {problem.selectedText ? (
+        <p className="selection-note">Using your highlighted excerpt from the problem.</p>
       ) : null}
     </section>
   );

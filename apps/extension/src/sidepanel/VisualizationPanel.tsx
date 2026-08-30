@@ -34,7 +34,10 @@ export function VisualizationPanel({ visualization }: Props) {
   const step = steps[stepIndex];
 
   return (
-    <section className="visualization-panel" aria-live="polite">
+    <section className="visualization-panel">
+      <p aria-atomic="true" aria-live="polite" className="sr-only">
+        Visualization step {stepIndex + 1} of {steps.length}: {step.title}
+      </p>
       <div className="step-heading">
         <div>
           <span className="step-count">
@@ -87,4 +90,3 @@ export function VisualizationPanel({ visualization }: Props) {
     </section>
   );
 }
-

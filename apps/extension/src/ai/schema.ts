@@ -155,6 +155,37 @@ export const directAnswerRequestSchema = z.object({
   currentCode: z.string().trim().min(8).max(20_000).optional(),
 });
 
+const problemChatTurnSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(3_000),
+});
+
+export const problemChatRequestSchema = z
+  .object({
+    problem: problemSchema,
+    teachingStyle: z.enum(["guided", "example", "pattern"]),
+    messages: z.array(problemChatTurnSchema).min(1).max(16),
+  })
+  .superRefine(({ messages }, context) => {
+    messages.forEach((message, index) => {
+      const expectedRole = index % 2 === 0 ? "user" : "assistant";
+      if (message.role !== expectedRole) {
+        context.addIssue({
+          code: "custom",
+          message: "Chat messages must alternate between learner and coach.",
+          path: ["messages", index, "role"],
+        });
+      }
+    });
+    if (messages.at(-1)?.role !== "user") {
+      context.addIssue({
+        code: "custom",
+        message: "The latest chat message must come from the learner.",
+        path: ["messages"],
+      });
+    }
+  });
+
 export const directAnswerSchema = z.object({
   approach: z.string().min(1).max(500),
   explanation: z.string().min(1).max(1_200),

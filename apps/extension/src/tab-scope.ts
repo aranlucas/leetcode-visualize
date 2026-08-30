@@ -5,6 +5,8 @@ export function supportsProblemPage(url?: string): boolean {
     const supportedHost =
       parsed.hostname === "leetcode.com" ||
       parsed.hostname.endsWith(".leetcode.com") ||
+      parsed.hostname === "leetcode.cn" ||
+      parsed.hostname.endsWith(".leetcode.cn") ||
       parsed.hostname === "neetcode.io";
     return supportedHost && /\/problems\/[^/]+/.test(parsed.pathname);
   } catch {

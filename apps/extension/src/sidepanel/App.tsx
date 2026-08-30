@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type {
   CurrentCode,
   DirectAnswer,
   Problem,
+  ProblemChatMessage,
   TeachingStyle,
   TutoringSession,
 } from "../types";
@@ -11,17 +18,29 @@ import {
   scopedTabIdFromSearch,
 } from "../tab-scope";
 import { AuthGate } from "./AuthGate";
+import { ChatPanel } from "./ChatPanel";
 import { CodeReviewPanel } from "./CodeReviewPanel";
-import { generateTutoringSession, getDirectAnswer } from "./bridge";
+import {
+  generateTutoringSession,
+  getDirectAnswer,
+  streamProblemQuestion,
+} from "./bridge";
 import {
   demoDirectAnswer,
   demoProblem,
   demoSession,
 } from "./demo";
-import { CodeIcon, EyeIcon, LogoMark, PlayIcon } from "./icons";
+import {
+  CodeIcon,
+  EyeIcon,
+  LogoMark,
+  PlayIcon,
+  QuestionIcon,
+} from "./icons";
 import { HintsPanel } from "./HintsPanel";
 import { STAGE_LABELS, STAGE_ORDER } from "./InterviewPath";
 import { ProblemHeader } from "./ProblemHeader";
+import { readProblemWithRecovery } from "./problem-reader";
 import {
   TEACHING_STYLES,
   TeachingStylePicker,
@@ -30,7 +49,15 @@ import { TutorPanel } from "./TutorPanel";
 import { useProblemPrismAuth } from "./useProblemPrismAuth";
 import { VisualizationPanel } from "./VisualizationPanel";
 
-type Tab = "approach" | "visualize" | "hints" | "code";
+type Tab = "approach" | "chat" | "visualize" | "hints" | "code";
+
+const SESSION_TABS: Array<{ id: Tab; label: string }> = [
+  { id: "approach", label: "Approach" },
+  { id: "chat", label: "Ask" },
+  { id: "visualize", label: "Visualize" },
+  { id: "hints", label: "Hints" },
+  { id: "code", label: "Code" },
+];
 
 const searchParams = new URLSearchParams(window.location.search);
 const isDemo = searchParams.has("demo");
@@ -47,14 +74,26 @@ async function activeTabId(): Promise<number | undefined> {
 async function readProblem(): Promise<Problem | null> {
   const tabId = await activeTabId();
   if (!tabId) return null;
-  try {
-    const response = (await chrome.tabs.sendMessage(tabId, {
-      type: "PROBLEM_PRISM_GET_PROBLEM",
-    })) as { problem?: Problem | null };
-    return response.problem ?? null;
-  } catch {
-    return null;
-  }
+
+  return readProblemWithRecovery({
+    injectContentScript: async () => {
+      if (!globalThis.chrome?.scripting) {
+        throw new Error("Chrome scripting is unavailable.");
+      }
+      await chrome.scripting.executeScript({
+        files: ["assets/content.js"],
+        target: { tabId },
+      });
+    },
+    requestProblem: async () => {
+      const response = (await chrome.tabs.sendMessage(tabId, {
+        type: "PROBLEM_PRISM_GET_PROBLEM",
+      })) as { problem?: Problem | null };
+      return response.problem ?? null;
+    },
+    wait: (milliseconds) =>
+      new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
+  });
 }
 
 function extractCodeFromPage(): string | undefined {
@@ -124,10 +163,16 @@ export default function App() {
   const [teachingStyle, setTeachingStyle] =
     useState<TeachingStyle>("guided");
   const [tab, setTab] = useState<Tab>("approach");
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(
+    () => new Set<Tab>(["approach"]),
+  );
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement>>>({});
   const [loadingProblem, setLoadingProblem] = useState(!isDemo);
   const [localError, setLocalError] = useState<string>();
   const [showConsent, setShowConsent] = useState(false);
   const [showInitialCodeReview, setShowInitialCodeReview] = useState(false);
+  const [showSetupChat, setShowSetupChat] = useState(false);
+  const [showPathPreview, setShowPathPreview] = useState(false);
   const problemIdentityRef = useRef(problemPageIdentity(problem?.url));
   const pendingProblemIdentityRef = useRef<string | undefined>(undefined);
   const generationRequestRef = useRef(0);
@@ -137,6 +182,11 @@ export default function App() {
   const [directAnswer, setDirectAnswer] = useState<DirectAnswer>();
   const [directAnswerPending, setDirectAnswerPending] = useState(false);
   const [directAnswerError, setDirectAnswerError] = useState<string>();
+  const chatRequestRef = useRef(0);
+  const chatStreamCancelRef = useRef<(() => void) | undefined>(undefined);
+  const [chatMessages, setChatMessages] = useState<ProblemChatMessage[]>([]);
+  const [chatPending, setChatPending] = useState(false);
+  const [chatError, setChatError] = useState<string>();
 
   const auth = useProblemPrismAuth();
   const authenticated = isDemo || auth.isAuthenticated;
@@ -154,6 +204,61 @@ export default function App() {
     setDirectAnswerError(undefined);
   };
 
+  const resetChat = () => {
+    chatRequestRef.current += 1;
+    chatStreamCancelRef.current?.();
+    chatStreamCancelRef.current = undefined;
+    setChatMessages([]);
+    setChatPending(false);
+    setChatError(undefined);
+  };
+
+  const selectTab = (nextTab: Tab, focus = false) => {
+    setTab(nextTab);
+    setVisitedTabs((current) => {
+      if (current.has(nextTab)) return current;
+      const next = new Set(current);
+      next.add(nextTab);
+      return next;
+    });
+    if (focus) tabRefs.current[nextTab]?.focus();
+  };
+
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentTab: Tab,
+  ) => {
+    const currentIndex = SESSION_TABS.findIndex(({ id }) => id === currentTab);
+    let nextIndex: number | undefined;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % SESSION_TABS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + SESSION_TABS.length) % SESSION_TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = SESSION_TABS.length - 1;
+    }
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    selectTab(SESSION_TABS[nextIndex].id, true);
+  };
+
+  useEffect(
+    () => () => {
+      chatStreamCancelRef.current?.();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!session) {
+      setTab("approach");
+      setVisitedTabs(new Set<Tab>(["approach"]));
+    }
+  }, [session]);
+
   const loadProblem = async ({ showLoading = true } = {}) => {
     if (isDemo) return;
     if (showLoading) setLoadingProblem(true);
@@ -169,6 +274,8 @@ export default function App() {
       setSession(null);
       resetGeneration();
       resetDirectAnswer();
+      resetChat();
+      setShowSetupChat(false);
     }
     problemIdentityRef.current = nextIdentity;
     setProblem(next);
@@ -254,6 +361,7 @@ export default function App() {
       setSession(null);
       resetGeneration();
       resetDirectAnswer();
+      resetChat();
       setLocalError(undefined);
     } catch {
       setLocalError("ProblemPrism could not read the current page selection.");
@@ -272,7 +380,7 @@ export default function App() {
         : await generateTutoringSession(problem, teachingStyle);
       if (requestId !== generationRequestRef.current) return;
       setSession(next);
-      setTab("approach");
+      selectTab("approach");
     } catch (generationFailure) {
       if (requestId !== generationRequestRef.current) return;
       setGenerationError(
@@ -321,11 +429,93 @@ export default function App() {
     }
   };
 
+  const sendChatQuestion = async (question: string) => {
+    if (!problem || chatPending) return false;
+    const requestId = ++chatRequestRef.current;
+    const userMessage: ProblemChatMessage = {
+      content: question,
+      id: `${Date.now()}-user`,
+      role: "user",
+    };
+    const requestMessages = [...chatMessages.slice(-14), userMessage].map(
+      ({ content, role }) => ({ content, role }),
+    );
+    const assistantMessageId = `${Date.now()}-assistant`;
+    const updateAssistant = (content: string, model: string) => {
+      if (requestId !== chatRequestRef.current) return;
+      setChatMessages((current) => {
+        const existing = current.find(
+          (message) => message.id === assistantMessageId,
+        );
+        if (existing) {
+          return current.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, content, model }
+              : message,
+          );
+        }
+        return [
+          ...current,
+          {
+            content,
+            id: assistantMessageId,
+            model,
+            role: "assistant" as const,
+          },
+        ];
+      });
+    };
+    setChatMessages((current) => [...current, userMessage]);
+    setChatError(undefined);
+    setChatPending(true);
+
+    try {
+      if (isDemo) {
+        updateAssistant(
+          "### Why check first?\n\nChecking before inserting means the map contains only **earlier indices**. That gives you two guarantees:\n\n- The current element cannot match itself.\n- A repeated value such as `[3, 3]` still works because the first `3` is already stored when you inspect the second.\n\nHow would that ordering behave when the target is `6`?",
+          "demo",
+        );
+      } else {
+        const stream = streamProblemQuestion(
+          problem,
+          teachingStyle,
+          requestMessages,
+          updateAssistant,
+        );
+        chatStreamCancelRef.current = stream.cancel;
+        const reply = await stream.completion;
+        updateAssistant(reply.content, reply.model);
+      }
+      if (requestId !== chatRequestRef.current) return true;
+      return true;
+    } catch (chatFailure) {
+      if (requestId !== chatRequestRef.current) return true;
+      setChatMessages((current) =>
+        current.filter(
+          (message) =>
+            message.id !== userMessage.id && message.id !== assistantMessageId,
+        ),
+      );
+      setChatError(
+        chatFailure instanceof Error
+          ? chatFailure.message
+          : "ChatGPT could not answer that question.",
+      );
+      return false;
+    } finally {
+      if (requestId === chatRequestRef.current) setChatPending(false);
+      if (requestId === chatRequestRef.current) {
+        chatStreamCancelRef.current = undefined;
+      }
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
         <div className="brand"><LogoMark /><span>ProblemPrism</span></div>
         <button
+          aria-label={isDemo ? "Demo mode" : "Log out of ProblemPrism"}
           className="connection-status connected"
           onClick={() => {
             if (!isDemo) auth.logout();
@@ -355,20 +545,42 @@ export default function App() {
       ) : (
         <>
           <ProblemHeader
-            compact={Boolean(session)}
+            compact={Boolean(session || showSetupChat)}
             isRefreshing={loadingProblem}
             onRefresh={() => void loadProblem()}
             onUseSelection={() => void useSelection()}
             problem={problem}
           />
 
-          {!session ? (
+          {!session && showSetupChat ? (
+            <>
+              <section className="setup-chat-bar">
+                <button
+                  className="text-button"
+                  onClick={() => setShowSetupChat(false)}
+                  type="button"
+                >
+                  Back to coaching setup
+                </button>
+              </section>
+              <ChatPanel
+                error={chatError}
+                isPending={chatPending}
+                layout="setup"
+                messages={chatMessages}
+                onClear={resetChat}
+                onSend={sendChatQuestion}
+                problemTitle={problem.title}
+              />
+            </>
+          ) : !session ? (
             <>
               <TeachingStylePicker
                 onChange={(style) => {
                   setTeachingStyle(style);
                   resetGeneration();
                   resetDirectAnswer();
+                  resetChat();
                 }}
                 value={teachingStyle}
               />
@@ -390,25 +602,42 @@ export default function App() {
                     onClick={() =>
                       setShowInitialCodeReview((current) => !current)
                     }
+                    aria-expanded={showInitialCodeReview}
+                    aria-label={
+                      showInitialCodeReview
+                        ? "Hide current code check"
+                        : "Check current code"
+                    }
                     type="button"
                   >
                     <CodeIcon />
                     {showInitialCodeReview
                       ? "Hide code check"
-                      : "Check my current code"}
+                      : "Check code"}
+                  </button>
+                  <button
+                    aria-label="Ask about this problem"
+                    className="secondary-button current-code-button"
+                    onClick={() => setShowSetupChat(true)}
+                    type="button"
+                  >
+                    <QuestionIcon />
+                    Ask
                   </button>
                 </div>
                 <p>Build the reasoning before the code.</p>
               </section>
 
               {showInitialCodeReview ? (
-                <CodeReviewPanel
-                  isDemo={isDemo}
-                  key={`${problem.url}:${teachingStyle}:setup`}
-                  problem={problem}
-                  readCode={readCurrentCode}
-                  teachingStyle={teachingStyle}
-                />
+                <div id="setup-code-review">
+                  <CodeReviewPanel
+                    isDemo={isDemo}
+                    key={`${problem.url}:${teachingStyle}:setup`}
+                    problem={problem}
+                    readCode={readCurrentCode}
+                    teachingStyle={teachingStyle}
+                  />
+                </div>
               ) : null}
 
               {error ? (
@@ -416,8 +645,16 @@ export default function App() {
               ) : null}
 
               <section className="path-preview">
-                <h2>Your interview path</h2>
-                <ol>
+                <button
+                  aria-controls="setup-interview-path"
+                  aria-expanded={showPathPreview}
+                  className="path-preview-toggle"
+                  onClick={() => setShowPathPreview((current) => !current)}
+                  type="button"
+                >
+                  Your interview path
+                </button>
+                <ol hidden={!showPathPreview} id="setup-interview-path">
                   {STAGE_ORDER.map((stageId, index) => (
                     <li className={index === 0 ? "active" : ""} key={stageId}>
                       <span>{index + 1}</span>
@@ -463,86 +700,126 @@ export default function App() {
                 <div className="error-banner" role="alert">{error}</div>
               ) : null}
 
-              <nav className="tabs coaching-tabs" aria-label="Learning modes">
-                <button
-                  aria-selected={tab === "approach"}
-                  className={tab === "approach" ? "active" : ""}
-                  onClick={() => setTab("approach")}
-                  role="tab"
-                  type="button"
-                >
-                  Approach
-                </button>
-                <button
-                  aria-selected={tab === "visualize"}
-                  className={tab === "visualize" ? "active" : ""}
-                  onClick={() => setTab("visualize")}
-                  role="tab"
-                  type="button"
-                >
-                  Visualize
-                </button>
-                <button
-                  aria-selected={tab === "hints"}
-                  className={tab === "hints" ? "active" : ""}
-                  onClick={() => setTab("hints")}
-                  role="tab"
-                  type="button"
-                >
-                  Hints
-                </button>
-                <button
-                  aria-selected={tab === "code"}
-                  className={tab === "code" ? "active" : ""}
-                  onClick={() => setTab("code")}
-                  role="tab"
-                  type="button"
-                >
-                  Check code
-                </button>
+              <nav
+                aria-label="Learning modes"
+                className="tabs coaching-tabs"
+                role="tablist"
+              >
+                {SESSION_TABS.map(({ id, label }) => (
+                  <button
+                    aria-controls={`tabpanel-${id}`}
+                    aria-selected={tab === id}
+                    className={tab === id ? "active" : ""}
+                    id={`tab-${id}`}
+                    key={id}
+                    onClick={() => selectTab(id)}
+                    onKeyDown={(event) => handleTabKeyDown(event, id)}
+                    ref={(element) => {
+                      tabRefs.current[id] = element ?? undefined;
+                    }}
+                    role="tab"
+                    tabIndex={tab === id ? 0 : -1}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
               </nav>
 
-              {tab === "approach" ? (
-                <TutorPanel
-                  isDemo={isDemo}
-                  problem={problem}
-                  session={session}
-                  teachingStyle={teachingStyle}
-                />
-              ) : tab === "visualize" ? (
-                session.visualization ? (
-                  <VisualizationPanel visualization={session.visualization} />
-                ) : (
-                  <section className="no-visualization">
-                    <EyeIcon />
-                    <h2>A diagram isn’t the best teacher here</h2>
-                    <p>{session.visualizationReason}</p>
-                    <button
-                      className="secondary-button"
-                      onClick={() => setTab("approach")}
-                      type="button"
-                    >
-                      Return to the interview path
-                    </button>
-                  </section>
-                )
-              ) : tab === "hints" ? (
-                <HintsPanel
-                  answer={directAnswer}
-                  answerError={directAnswerError}
-                  hints={session.hints}
-                  isAnswerPending={directAnswerPending}
-                  onRevealAnswer={() => void revealDirectAnswer()}
-                />
-              ) : (
-                <CodeReviewPanel
-                  isDemo={isDemo}
-                  key={`${problem.url}:${teachingStyle}:session`}
-                  problem={problem}
-                  readCode={readCurrentCode}
-                  teachingStyle={teachingStyle}
-                />
-              )}
+              <div
+                aria-labelledby="tab-approach"
+                hidden={tab !== "approach"}
+                id="tabpanel-approach"
+                role="tabpanel"
+                tabIndex={0}
+              >
+                {visitedTabs.has("approach") ? (
+                  <TutorPanel
+                    isDemo={isDemo}
+                    problem={problem}
+                    session={session}
+                    teachingStyle={teachingStyle}
+                  />
+                ) : null}
+              </div>
+              <div
+                aria-labelledby="tab-chat"
+                hidden={tab !== "chat"}
+                id="tabpanel-chat"
+                role="tabpanel"
+                tabIndex={0}
+              >
+                {visitedTabs.has("chat") ? (
+                  <ChatPanel
+                    error={chatError}
+                    isPending={chatPending}
+                    messages={chatMessages}
+                    onClear={resetChat}
+                    onSend={sendChatQuestion}
+                    problemTitle={problem.title}
+                  />
+                ) : null}
+              </div>
+              <div
+                aria-labelledby="tab-visualize"
+                hidden={tab !== "visualize"}
+                id="tabpanel-visualize"
+                role="tabpanel"
+                tabIndex={0}
+              >
+                {visitedTabs.has("visualize") ? (
+                  session.visualization ? (
+                    <VisualizationPanel visualization={session.visualization} />
+                  ) : (
+                    <section className="no-visualization">
+                      <EyeIcon />
+                      <h2>A diagram isn’t the best teacher here</h2>
+                      <p>{session.visualizationReason}</p>
+                      <button
+                        className="secondary-button"
+                        onClick={() => selectTab("approach")}
+                        type="button"
+                      >
+                        Return to the interview path
+                      </button>
+                    </section>
+                  )
+                ) : null}
+              </div>
+              <div
+                aria-labelledby="tab-hints"
+                hidden={tab !== "hints"}
+                id="tabpanel-hints"
+                role="tabpanel"
+                tabIndex={0}
+              >
+                {visitedTabs.has("hints") ? (
+                  <HintsPanel
+                    answer={directAnswer}
+                    answerError={directAnswerError}
+                    hints={session.hints}
+                    isAnswerPending={directAnswerPending}
+                    onRevealAnswer={() => void revealDirectAnswer()}
+                  />
+                ) : null}
+              </div>
+              <div
+                aria-labelledby="tab-code"
+                hidden={tab !== "code"}
+                id="tabpanel-code"
+                role="tabpanel"
+                tabIndex={0}
+              >
+                {visitedTabs.has("code") ? (
+                  <CodeReviewPanel
+                    isDemo={isDemo}
+                    key={`${problem.url}:${teachingStyle}:session`}
+                    problem={problem}
+                    readCode={readCurrentCode}
+                    teachingStyle={teachingStyle}
+                  />
+                ) : null}
+              </div>
             </>
           )}
         </>

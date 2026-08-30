@@ -27,10 +27,24 @@
       "matches": [
         "https://leetcode.com/problems/*",
         "https://*.leetcode.com/problems/*",
+        "https://leetcode.cn/problems/*",
+        "https://*.leetcode.cn/problems/*",
         "https://neetcode.io/problems/*"
       ],
       "js": [
         "assets/content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://leetcode.com/problems/*",
+        "https://*.leetcode.com/problems/*",
+        "https://leetcode.cn/problems/*",
+        "https://*.leetcode.cn/problems/*"
+      ],
+      "js": [
+        "assets/formatter.js"
       ],
       "run_at": "document_idle"
     }
@@ -40,6 +54,8 @@
     "https://chatgpt.com/*",
     "https://leetcode.com/*",
     "https://*.leetcode.com/*",
+    "https://leetcode.cn/*",
+    "https://*.leetcode.cn/*",
     "https://neetcode.io/*"
   ],
   "permissions": [
@@ -52,5 +68,18 @@
   ],
   "side_panel": {
     "default_path": "sidepanel.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "formatter/*"
+      ],
+      "matches": [
+        "https://leetcode.com/*",
+        "https://*.leetcode.com/*",
+        "https://leetcode.cn/*",
+        "https://*.leetcode.cn/*"
+      ]
+    }
+  ]
 }

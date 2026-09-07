@@ -2,15 +2,16 @@
   "name": "problem-prism",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "workspaces": [
     "apps/extension"
   ],
+  "type": "module",
   "scripts": {
     "build": "npm run build --workspaces",
-    "check": "npm run check --workspaces",
+    "check": "npm run typecheck",
     "dev:extension": "npm run dev --workspace @problem-prism/extension",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
   },
   "engines": {
     "node": "^24.15.0"

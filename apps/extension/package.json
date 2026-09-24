@@ -14,7 +14,7 @@
     "@ai-sdk/openai": "4.0.66",
     "@opencoredev/loginwithchatgpt-ai": "0.2.0",
     "@opencoredev/loginwithchatgpt-core": "0.2.0",
-    "ai": "7.0.47",
+    "ai": "7.0.107",
     "react": "^19.2.8",
     "react-dom": "^19.3.0",
     "streamdown": "^2.6.0",

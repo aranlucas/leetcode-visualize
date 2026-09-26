@@ -37,29 +37,16 @@ afterAll(() => {
   delete reactTestGlobal.IS_REACT_ACT_ENVIRONMENT;
 });
 
-describe("App coaching setup", () => {
-  it("exposes the interview path as a compact disclosure", () => {
+describe("App first visit", () => {
+  it("prepares context automatically and leaves chat available", async () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    act(() => root?.render(<App />));
-
-    const toggle = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.trim() === "Your interview path");
-    const path = container.querySelector<HTMLOListElement>(
-      "#setup-interview-path",
-    );
-
-    expect(toggle).toBeDefined();
-    expect(toggle?.getAttribute("aria-controls")).toBe("setup-interview-path");
-    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
-    expect(path?.hidden).toBe(true);
-
-    act(() => toggle?.click());
-
-    expect(toggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(path?.hidden).toBe(false);
-    expect(path?.querySelectorAll("li")).toHaveLength(5);
+    await act(async () => root?.render(<App />));
+    expect(container.querySelector("#problem-chat-input")).not.toBeNull();
+    expect(container.textContent).toContain("Find two different positions");
+    expect(container.querySelector("select")).toBeNull();
+    expect(container.querySelector('[role="tablist"]')).toBeNull();
+    expect(container.textContent).not.toContain("Start coaching");
   });
 });

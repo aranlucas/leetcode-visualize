@@ -23,16 +23,14 @@ export function AnswerFeedbackPanel({
       <div className="answer-coach-heading">
         <div>
           <h3 id="practice-answer-title">Practice your answer</h3>
-          <p>Write what you would say to the interviewer.</p>
         </div>
-        <SparkIcon />
       </div>
       <textarea
         aria-label="Your interview answer"
         maxLength={4_000}
         onChange={(event) => onAnswerChange(event.target.value)}
         placeholder="Explain your thinking in your own words…"
-        rows={5}
+        rows={4}
         value={answer}
       />
       <div className="answer-actions">

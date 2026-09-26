@@ -1,5 +1,6 @@
 import {
   type FormEvent,
+  type ReactNode,
   lazy,
   Suspense,
   useEffect,
@@ -12,18 +13,12 @@ import { SendIcon, SparkIcon } from "./icons";
 interface Props {
   error?: string;
   isPending: boolean;
-  layout?: "session" | "setup";
+  tools?: ReactNode;
   messages: ProblemChatMessage[];
   onClear: () => void;
   onSend: (question: string) => Promise<boolean>;
   problemTitle: string;
 }
-
-const starterQuestions = [
-  "What do the constraints suggest?",
-  "Can we walk through a small example?",
-  "What should I notice before choosing an approach?",
-];
 
 const MarkdownMessage = lazy(() =>
   import("./MarkdownMessage").then((module) => ({
@@ -34,7 +29,7 @@ const MarkdownMessage = lazy(() =>
 export function ChatPanel({
   error,
   isPending,
-  layout = "session",
+  tools,
   messages,
   onClear,
   onSend,
@@ -57,22 +52,14 @@ export function ChatPanel({
     if (!sent) setDraft(question);
   };
 
-  const useStarter = (question: string) => {
-    setDraft(question);
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLTextAreaElement>("#problem-chat-input")?.focus();
-    });
-  };
-
   return (
     <section
-      className={`chat-panel ${layout} ${messages.length ? "has-messages" : ""}`}
+      className={`chat-panel ${messages.length ? "has-messages" : ""}`}
       aria-labelledby="problem-chat-heading"
     >
       <header className={`chat-panel-header ${messages.length ? "conversation" : ""}`}>
-        <div className={messages.length ? "sr-only" : undefined}>
+        <div className="sr-only">
           <h2 id="problem-chat-heading">Ask about {problemTitle}</h2>
-          <p>Explore the reasoning without leaving the problem.</p>
         </div>
         {messages.length ? (
           <button className="text-button" onClick={onClear} type="button">
@@ -89,20 +76,7 @@ export function ChatPanel({
         ref={messageListRef}
         role="log"
       >
-        {!messages.length ? (
-          <div className="chat-welcome">
-            <span className="chat-welcome-icon"><SparkIcon /></span>
-            <h3>What are you thinking?</h3>
-            <p>Ask about an example, a constraint, an edge case, or why an approach works.</p>
-            <div className="starter-questions">
-              {starterQuestions.map((question) => (
-                <button key={question} onClick={() => useStarter(question)} type="button">
-                  {question}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
+        {
           messages.map((message, index) => {
             const isStreaming =
               isPending &&
@@ -131,7 +105,7 @@ export function ChatPanel({
               </article>
             );
           })
-        )}
+        }
 
         {isPending && messages.at(-1)?.role !== "assistant" ? (
           <article className="chat-message assistant pending">
@@ -146,11 +120,9 @@ export function ChatPanel({
 
       {error ? <div className="chat-error" role="alert">{error}</div> : null}
 
+      {tools}
+
       <footer className="chat-composer-area">
-        <div className="chat-context">
-          <span><SparkIcon /></span>
-          <strong>Discussing “{problemTitle}”</strong>
-        </div>
         <form className="chat-composer" onSubmit={(event) => void submit(event)}>
           <label className="sr-only" htmlFor="problem-chat-input">Ask a question about this problem</label>
           <textarea
@@ -164,7 +136,7 @@ export function ChatPanel({
                 void submit();
               }
             }}
-            placeholder="Ask anything about this problem"
+            placeholder="Where are you stuck? Ask or share your thinking…"
             rows={2}
             value={draft}
           />

@@ -8,7 +8,7 @@ import type {
 import { reviewAnswer } from "./bridge";
 import { AnswerFeedbackPanel } from "./AnswerFeedbackPanel";
 import { demoAnswerFeedback } from "./demo";
-import { ArrowIcon, EyeIcon, LockIcon, QuestionIcon, SparkIcon } from "./icons";
+import { ArrowIcon, EyeIcon, QuestionIcon } from "./icons";
 import { InterviewPath, STAGE_LABELS, STAGE_ORDER } from "./InterviewPath";
 
 interface Props {
@@ -109,28 +109,31 @@ export function TutorPanel({
   return (
     <section className="tutor-panel">
       <div className="path-heading" ref={pathHeadingRef}>
-        <h2>Your interview path</h2>
-        <span>{stageIndex + 1} of {stages.length}</span>
+        <details className="stage-progress">
+          <summary>Step {stageIndex + 1} of {stages.length} · {STAGE_LABELS[stage.id]}</summary>
+          <InterviewPath
+            activeIndex={stageIndex}
+            furthestIndex={furthestIndex}
+            onSelect={goToStage}
+          />
+        </details>
       </div>
       <p aria-atomic="true" aria-live="polite" className="sr-only">
         Stage {stageIndex + 1} of {stages.length}: {stage.title}
       </p>
-      <InterviewPath
-        activeIndex={stageIndex}
-        furthestIndex={furthestIndex}
-        onSelect={goToStage}
-      />
 
       <article className="coaching-stage">
         <header className="coaching-stage-header">
-          <span>{stageIndex + 1}</span>
           <div>
             <h2>{stage.title}</h2>
             <p>{stage.objective}</p>
           </div>
         </header>
 
-        <div className="coaching-sections">
+        <p className="coach-prompt">{stage.coachPrompt}</p>
+
+        <details className="coaching-sections" key={stage.id}>
+          <summary>Explore this step</summary>
           {stage.sections.map((section) => (
             <section className="coaching-section" key={section.title}>
               <h3>{section.title}</h3>
@@ -147,15 +150,7 @@ export function TutorPanel({
               ) : null}
             </section>
           ))}
-        </div>
-
-        <aside className="coach-prompt">
-          <SparkIcon />
-          <div>
-            <strong>Coach prompt</strong>
-            <p>{stage.coachPrompt}</p>
-          </div>
-        </aside>
+        </details>
 
         <AnswerFeedbackPanel
           answer={answer}
@@ -220,11 +215,6 @@ export function TutorPanel({
             {nextStage ? <ArrowIcon direction="right" /> : null}
           </button>
         </div>
-
-        <p className="no-code-note">
-          <LockIcon />
-          No code yet — build the reasoning first.
-        </p>
       </article>
     </section>
   );

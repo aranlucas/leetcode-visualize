@@ -46,51 +46,36 @@ export function ProblemHeader({
       className={compact ? "problem-header compact" : "problem-header"}
       aria-labelledby="problem-title"
     >
-      {!compact ? (
-        <div className="section-label-row">
-          <span className="section-label">
-            Detected on {problem.platform === "leetcode" ? "LeetCode" : "NeetCode"}
+      <div className="title-row">
+        <h1 id="problem-title">{problem.title}</h1>
+        {problem.difficulty ? (
+          <span className={`tag difficulty-${problem.difficulty.toLowerCase()}`}>
+            {problem.difficulty}
+          </span>
+        ) : null}
+      </div>
+      <details className="problem-details">
+        <summary>Problem details &amp; tools</summary>
+        <div className="problem-tools">
+          <span className="problem-platform">
+            {problem.platform === "leetcode" ? "LeetCode" : "NeetCode"}
           </span>
           {refreshButton}
+          {externalLink}
         </div>
-      ) : null}
-      <div className="title-row">
-        <div>
-          <h1 id="problem-title">{problem.title}</h1>
-          <div className="tags" aria-label="Problem metadata">
-            {problem.difficulty ? (
-              <span className={`tag difficulty-${problem.difficulty.toLowerCase()}`}>
-                {problem.difficulty}
-              </span>
-            ) : null}
-            {problem.topics.slice(0, 3).map((topic) => (
-              <span className="tag" key={topic}>
-                {topic}
-              </span>
-            ))}
-          </div>
+        <div className="tags" aria-label="Problem topics">
+          {problem.topics.map((topic) => <span className="tag" key={topic}>{topic}</span>)}
         </div>
-        {compact ? (
-          <div
-            aria-label="Problem actions"
-            className="tags"
-            role="group"
-          >
-            {refreshButton}
-            {externalLink}
-          </div>
-        ) : externalLink}
-      </div>
-      <button
-        aria-label="Use highlighted question text"
-        aria-pressed={Boolean(problem.selectedText)}
-        className="selection-button"
-        onClick={onUseSelection}
-        title="Use highlighted question text from the problem"
-        type="button"
-      >
-        {compact ? "Use highlighted text" : "Use highlighted question text"}
-      </button>
+        <button
+          aria-label="Use highlighted question text"
+          aria-pressed={Boolean(problem.selectedText)}
+          className="selection-button"
+          onClick={onUseSelection}
+          type="button"
+        >
+          Use highlighted text
+        </button>
+      </details>
       {problem.selectedText ? (
         <p className="selection-note">Using your highlighted excerpt from the problem.</p>
       ) : null}

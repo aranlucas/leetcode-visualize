@@ -50,6 +50,7 @@ function unmount() {
 
 beforeAll(async () => {
   reactTestGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   window.history.replaceState(null, "", "/sidepanel.html?demo=1");
   App = (await import("./App")).default;
 }, 30_000);
@@ -59,74 +60,31 @@ afterAll(() => {
   delete reactTestGlobal.IS_REACT_ACT_ENVIRONMENT;
 });
 
-describe("App learning modes", () => {
-  it("keeps visited panel state mounted while switching modes", () => {
+describe("App problem conversation", () => {
+  it("opens with problem context and chat without setup or tabs", () => {
     mount();
-    const answer = container?.querySelector<HTMLTextAreaElement>(
-      'textarea[aria-label="Your interview answer"]',
-    );
-    expect(answer).toBeDefined();
-
-    act(() => {
-      if (!answer) return;
-      const setTextareaValue = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        "value",
-      )?.set;
-      setTextareaValue?.call(
-        answer,
-        "I would track each earlier value in a map.",
-      );
-      answer.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-
-    clickButton("Hints");
-    clickButton("Show me a hint");
-    expect(container?.querySelector("#tabpanel-approach")?.hasAttribute("hidden")).toBe(
-      true,
-    );
-
-    clickButton("Approach");
-    expect(container?.querySelector("#tabpanel-approach")?.hasAttribute("hidden")).toBe(
-      false,
-    );
-    expect(
-      container?.querySelector<HTMLTextAreaElement>(
-        'textarea[aria-label="Your interview answer"]',
-      )?.value,
-    ).toBe("I would track each earlier value in a map.");
-
-    clickButton("Hints");
-    expect(container?.textContent).toContain("Hint 1");
+    expect(container?.querySelector('[role="tablist"]')).toBeNull();
+    expect(container?.querySelector("select")).toBeNull();
+    expect(container?.querySelector("#problem-chat-input")).not.toBeNull();
+    expect(container?.textContent).toContain("Find two different positions");
+    const practice = Array.from(container?.querySelectorAll("details") ?? [])
+      .find((detail) => detail.querySelector("summary")?.textContent === "Practice for an interview");
+    expect(practice).toBeDefined();
+    expect(practice?.open).toBe(false);
     unmount();
   });
 
-  it("supports roving keyboard navigation across the tablist", () => {
+  it("preserves interview work when optional practice is closed", () => {
     mount();
-    for (const tabButton of container?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    ) ?? []) {
-      const panelId = tabButton.getAttribute("aria-controls");
-      expect(panelId).toBeTruthy();
-      expect(container?.querySelector(`#${panelId}`)).not.toBeNull();
-    }
-
-    const approach = container?.querySelector<HTMLButtonElement>("#tab-approach");
-    expect(approach?.getAttribute("aria-selected")).toBe("true");
-
-    act(() => {
-      approach?.focus();
-      approach?.dispatchEvent(
-        new KeyboardEvent("keydown", { bubbles: true, key: "End" }),
-      );
-    });
-
-    const code = container?.querySelector<HTMLButtonElement>("#tab-code");
-    expect(code?.getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(code);
-    expect(container?.querySelector("#tabpanel-code")?.hasAttribute("hidden")).toBe(
-      false,
-    );
+    const practice = Array.from(container?.querySelectorAll("details") ?? [])
+      .find((detail) => detail.querySelector("summary")?.textContent === "Practice for an interview");
+    act(() => { practice?.querySelector("summary")?.click(); });
+    clickButton("Next: Notice");
+    act(() => { practice?.querySelector("summary")?.click(); });
+    expect(practice?.open).toBe(false);
+    act(() => { practice?.querySelector("summary")?.click(); });
+    expect(practice?.textContent).toContain("Notice the relationship");
+    expect(practice?.querySelector(".stage-progress summary")?.textContent).toContain("Step 2 of 5");
     unmount();
   });
 });

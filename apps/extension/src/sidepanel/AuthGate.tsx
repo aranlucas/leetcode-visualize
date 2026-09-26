@@ -60,7 +60,7 @@ export function AuthGate({
       <section className="auth-gate consent">
         <h1>Authorize ProblemPrism to use ChatGPT?</h1>
         <ul>
-          <li>ProblemPrism can request interview coaching, answer critique, and visualizations against your own ChatGPT plan until you disconnect.</li>
+          <li>Opening a problem automatically prepares an explanation and supporting material using your ChatGPT plan. You can also ask questions, request code review, or practice for an interview.</li>
           <li>Your problem text, practice answers, and current editor code you explicitly ask to check go directly from this extension to OpenAI. There is no ProblemPrism server.</li>
           <li>Generated coaching is cached locally in Chrome for up to 30 days to avoid repeating the same ChatGPT request. Disconnecting clears that cache.</li>
           <li>If you choose “I just want the answer,” ProblemPrism schedules a local Chrome notification for the next day so you can retry the problem without looking.</li>
